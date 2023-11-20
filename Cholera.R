@@ -453,3 +453,200 @@ class_distribution <- cbind(frequency = table(cholera_undersampled_choleraDiagno
 
 print(class_distribution)
 
+# Dataset Splitting ----
+# Define a 75:25 train:test data split of the dataset.
+# That is, 75% of the original data will be used to train the model and
+# 25% of the original data will be used to test the model.
+
+train_index <- createDataPartition(cholera_undersampled$choleraDiagnosis,
+                                   p = 0.75,
+                                   list = FALSE)
+cholera_train <- cholera_undersampled[train_index, ]
+cholera_test <- cholera_undersampled[-train_index, ]
+
+# Cross Validation ----
+# 5-fold cross-validation
+
+train_control <- trainControl(method = "cv", number = 5)
+
+## Random Forest ----
+# Train the Random Forest model
+
+set.seed(7)
+cholera_model_rf <- train(choleraDiagnosis ~ ., data = cholera_train, method = "rf",
+                          metric = "Accuracy", trControl = train_control)
+
+# Print the trained model
+
+print(cholera_model_rf)
+
+# Conclusion: The random forest model has been successfully trained on your 
+# cholera dataset. The results show that the model has achieved perfect accuracy
+# and kappa values across the tested values of mtry. The final selected value 
+# for the model was mtry = 2. You can further analyze the model and make any 
+# necessary adjustments based on this information.
+
+### Calculating Metrics ----
+# Compute the metric yourself using the test dataset
+# Confusion matrix for binary classification problem
+
+cholera_predictions_rf <- predict(cholera_model_rf, cholera_test)
+cholera_confusion_matrix_rf <- caret::confusionMatrix(cholera_predictions_rf, cholera_test$choleraDiagnosis)
+print(cholera_confusion_matrix_rf)
+
+### Confusion Matrix ----
+# Display a graphical confusion matrix
+
+fourfoldplot(as.table(cholera_confusion_matrix_rf), color = c("grey", "lightblue"),
+             main = "Confusion Matrix (RF)")
+
+# Save the model
+
+saveRDS(cholera_model_rf, "Cholera_Model/cholera_model_rf.rds")
+
+## Logistic Regression 1 ----
+# We can use "regLogistic" 
+# Notice the data transformation applied when we call the train function
+# in caret, i.e., a standardize data transform (center + scale)
+
+set.seed(7)
+cholera_caret_model_logistic <-
+  train(choleraDiagnosis ~ ., data = cholera_train,
+        method = "regLogistic", metric = "Accuracy",
+        preProcess = c("center", "scale"), trControl = train_control)
+
+# Display the model's details 
+
+print(cholera_caret_model_logistic)
+
+### Calculating Metrics ----
+# Make predictions
+
+cholera_predictions_lr <- predict(cholera_caret_model_logistic,
+                                  cholera_test)
+
+# Display the model's evaluation metrics 
+
+cholera_confusion_matrix_lr <-
+  caret::confusionMatrix(cholera_predictions_lr,
+                         cholera_test$choleraDiagnosis)
+print(cholera_confusion_matrix_lr)
+
+### Confusion Matrix ----
+
+fourfoldplot(as.table(cholera_confusion_matrix_lr), color = c("grey", "lightblue"),
+             main = "Confusion Matrix (LR 1)")
+
+# Save the model
+
+saveRDS(cholera_caret_model_logistic, "Cholera_Model/cholera_model.rds")
+
+## Logistic Regression 2 ----
+# We can use "glmnet" 
+
+set.seed(7)
+cholera_caret_model_logistic_two <- train(
+  choleraDiagnosis ~ ., 
+  data = cholera_train,
+  method = "glmnet",
+  family = "binomial",
+  metric = "Accuracy",
+  preProcess = c("center", "scale"),
+  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE),
+  maxit = 1000
+)
+
+# Check for multicollinearity
+findLinearCombos(cholera_train[, -which(names(cholera_train) %in% "choleraDiagnosis")])
+
+print(cholera_caret_model_logistic_two)
+
+### Calculating Metrics ----
+# Make predictions
+
+cholera_predictions_lr_two <- predict(cholera_caret_model_logistic_two,
+                                      cholera_test)
+
+# Display the model's evaluation metrics 
+
+cholera_confusion_matrix_lr_two <-
+  caret::confusionMatrix(cholera_predictions_lr_two,
+                         cholera_test$choleraDiagnosis)
+print(cholera_confusion_matrix_lr_two)
+
+### Confusion Matrix ----
+
+fourfoldplot(as.table(cholera_confusion_matrix_lr_two), color = c("grey", "lightblue"),
+             main = "Confusion Matrix (LR 2)")
+
+# Save the model
+
+saveRDS(cholera_caret_model_logistic_two, "Cholera_Model/cholera_model_two.rds")
+
+# Performance Comparison using Resamples ----
+# Create a list of the model results
+model_list <- list(
+  Random_Forest = cholera_model_rf,
+  Logistic_Regression_1 = cholera_caret_model_logistic,
+  Logistic_Regression_2 = cholera_caret_model_logistic_two
+)
+
+# Pass the list as an argument to the resamples function
+results <- resamples(model_list)
+
+# Display the summary of resampling results
+summary(results)
+
+# Conclusion ----
+
+# After evaluating three different models, it is evident that Logistic Regression 2 
+# performs the best in terms of accuracy and balance between sensitivity and specificity.
+# The model employs a glmnet algorithm with alpha value set to 0.1 and lambda value 
+# set to 0.0294.
+# Its accuracy of 67.08% and balanced sensitivity and specificity make it a relatively
+# robust choice for classifying cholera cases.
+# The regularization approach used in this model aids in preventing overfitting, 
+# ensuring generalizability to unseen data.
+# Therefore, Logistic Regression 2 is the preferred model for the classification task at hand.
+
+# Bootstrapping for the Logistic Regression 2 Model ----
+
+# Number of bootstrap samples
+num_bootstrap_samples <- 1000
+
+# Create an empty vector to store bootstrapped accuracy values
+bootstrap_accuracies <- numeric(num_bootstrap_samples)
+
+# Set seed for reproducibility
+set.seed(7)
+
+# Perform bootstrapping
+for (i in 1:num_bootstrap_samples) {
+  # Sample with replacement from the training data
+  bootstrap_sample <- cholera_train[sample(nrow(cholera_train), replace = TRUE), ]
+  
+  # Train Logistic Regression 2 model on the bootstrap sample
+  cholera_model_lr_two_bootstrap <- train(
+    choleraDiagnosis ~ ., 
+    data = bootstrap_sample,
+    method = "glmnet",
+    family = "binomial",
+    metric = "Accuracy",
+    preProcess = c("center", "scale"),
+    trControl = trainControl(method = "cv", number = 5, verboseIter = FALSE),
+    maxit = 1000
+  )
+  
+  # Make predictions on the test set
+  cholera_predictions_bootstrap <- predict(cholera_model_lr_two_bootstrap, cholera_test)
+  
+  # Calculate accuracy and store it
+  bootstrap_accuracies[i] <- confusionMatrix(cholera_predictions_bootstrap, cholera_test$choleraDiagnosis)$overall["Accuracy"]
+}
+
+# Display summary statistics of bootstrapped accuracies
+summary(bootstrap_accuracies)
+
+# Visualize the distribution of bootstrapped accuracies
+hist(bootstrap_accuracies, main = "Bootstrapped Accuracies for Logistic Regression 2", xlab = "Accuracy")
+
