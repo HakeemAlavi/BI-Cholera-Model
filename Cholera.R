@@ -650,3 +650,80 @@ summary(bootstrap_accuracies)
 # Visualize the distribution of bootstrapped accuracies
 hist(bootstrap_accuracies, main = "Bootstrapped Accuracies for Logistic Regression 2", xlab = "Accuracy")
 
+# Summary of bootstrapped accuracies for Logistic Regression 2
+# Minimum accuracy observed in the bootstrapped samples
+# 0.6211
+
+# First quartile (25th percentile) of bootstrapped accuracies
+# 0.6553
+
+# Median accuracy across the bootstrapped samples
+# 0.6646
+
+# Mean accuracy calculated from the bootstrapped samples
+# 0.6637
+
+# Third quartile (75th percentile) of bootstrapped accuracies
+# 0.6739
+
+# Maximum accuracy observed in the bootstrapped samples
+# 0.6988
+
+# Model Selection Conclusion:
+
+# After careful consideration of the cholera classification task and evaluating both the normal
+# and bootstrapped logistic regression models, I have decided to settle on the model with the
+# normal accuracy estimate. The reason for this choice is that, in the context of my project,
+# a single-point accuracy estimate is sufficient for decision-making, and the normal model
+# provides a clear and straightforward metric.
+
+# While the bootstrapped model offers insights into the variability of accuracy, the additional
+# complexity may not be necessary for the current project goals. The normal model, with an accuracy
+# around 66-67%, aligns well with the objectives of accurately classifying cholera cases without
+# introducing unnecessary complexity.
+
+# Therefore, I recommend using the logistic regression model with normal accuracy for the cholera
+# classification task in this project.
+
+
+# Hyperparameter Tuning ----
+
+library(caret)
+
+# Create a grid for tuning
+
+grid <- expand.grid(alpha = 0:1, lambda = seq(0.001, 0.1, by = 0.001))
+
+# Tune the model
+
+cholera_caret_model_logistic_two_tuned <- train(
+  choleraDiagnosis ~ ., 
+  data = cholera_train,
+  method = "glmnet",
+  family = "binomial",
+  metric = "Accuracy",
+  preProcess = c("center", "scale"),
+  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE),
+  maxit = 1000,
+  tuneGrid = grid
+)
+
+print(cholera_caret_model_logistic_two_tuned)
+
+# Make predictions
+cholera_predictions_lr_two_tuned <- predict(cholera_caret_model_logistic_two_tuned,
+                                            cholera_test)
+
+# Display the model's evaluation metrics
+cholera_confusion_matrix_lr_two_tuned <- caret::confusionMatrix(cholera_predictions_lr_two_tuned,
+                                                                cholera_test$choleraDiagnosis)
+print(cholera_confusion_matrix_lr_two_tuned)
+
+# Display Confusion Matrix
+fourfoldplot(as.table(cholera_confusion_matrix_lr_two_tuned), color = c("grey", "lightblue"),
+             main = "Confusion Matrix (LR 2 Tuned)")
+
+# Conclusion:
+# The hyperparameter tuning did not elicit any improvement on the current model of 
+# choice (Logistic Regression 2) thus has not realized any additional benefit
+
