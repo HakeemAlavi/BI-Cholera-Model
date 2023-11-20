@@ -21,7 +21,7 @@ dim(cholera)
 sapply(cholera, class)
 
 # Descriptive Statistics ----
-## Measures of frequency ----
+## Measures of Frequency ----
 
 cholera_freq <- cholera$male
 cbind(frequency = table(cholera_freq),
@@ -55,7 +55,7 @@ cholera_freq <- cholera$choleraDiagnosis
 cbind(frequency = table(cholera_freq),
       percentage = prop.table(table(cholera_freq)) *100)
 
-## Measures of central tendency - Mode ----
+## Measures of Central Tendency - Mode ----
 
 cholera_male_mode <- names(table(cholera$male))[
   which(table(cholera$male) == max(table(cholera$male)))
@@ -93,7 +93,7 @@ cholera_choleraDiagnosis_mode <- names(table(cholera$choleraDiagnosis))[
 
 summary(cholera)
 
-## Check columns with missing values ----
+## Check Columns with Missing Values ----
 
 check_missing_values <- function(data) {
   missing_columns <- colnames(data)[apply(data, 2, function(x) any(is.na(x)))]
@@ -114,7 +114,7 @@ check_missing_values(cholera)
 
 ## Data Imputation ----
 # Data needs to be imputed to further proceed with the descriptive statistics
-### Install required packages to begin imputation ----
+### Install Required Packages to Begin Imputation ----
 
 if (!is.element("dplyr", installed.packages()[, 1])) {
   install.packages("dplyr", dependencies = TRUE,
@@ -282,7 +282,7 @@ vis_miss(cholera_imputed) + theme(axis.text.x = element_text(angle = 80))
 
 # gg_miss_upset(cholera_imputed)
 
-## Measures of distribution ----
+## Measures of Distribution ----
 # Standard Deviation
 
 sapply(cholera[, c(1, 2, 3, 4, 5, 6, 7, 8)], sd)
@@ -316,3 +316,51 @@ View(cholera_imputed_cov)
 
 cholera_imputed_cor <- cor(cholera_imputed [c(1, 2, 3, 4, 5, 6, 7, 8)])
 View(cholera_imputed_cor)
+
+# Inferential Statistics ----
+# Fit the logistic regression model
+cholera_inferential <- glm(choleraDiagnosis ~ age + education + wateryDiarrhoea + 
+                       dehydration + vomiting + muscleCramps + 
+                       rapidHeartRate, 
+                     data = cholera_imputed, family = "binomial")
+
+# Perform ANOVA for the entire model
+anova_result <- anova(cholera_inferential, test = "Chisq")
+summary(anova_result)
+
+# The degrees of freedom (Df) represent the number of parameters estimated in the model.
+# Deviance is a measure of how well the model fits the data. It decreases as the model improves.
+# Resid. Df is the residual degrees of freedom, indicating the number of data points minus the number of parameters estimated.
+# Resid. Dev is the residual deviance, a measure of how well the model explains the variability not accounted for by the predictors.
+# Pr(>Chi) represents the p-value associated with the Chi-square test of the entire model.
+
+# The first quartile (1st Qu.) of p-values is extremely low, suggesting that the overall model is statistically significant.
+# Median and mean values of deviance and p-values provide additional insights into the goodness of fit.
+
+# Note: One NA value indicates that there might be missing data in the model.
+
+# It's important to carefully consider these results to assess the overall effectiveness of the logistic regression model.
+
+# Univariate Plots ----
+# Univariate plot for Age
+ggplot(cholera_imputed, aes(x = age)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Age", x = "Age", y = "Frequency")
+
+# Univariate plot for Education
+ggplot(cholera_imputed, aes(x = education)) +
+  geom_histogram(binwidth = 1, fill = "green", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Education", x = "Education", y = "Frequency")
+
+# Univariate plot for Rapid Heart Rate
+ggplot(cholera_imputed, aes(x = rapidHeartRate)) +
+  geom_histogram(binwidth = 1, fill = "orange", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Rapid Heart Rate", x = "Rapid Heart Rate", y = "Frequency")
+
+# Multivariate Plots ----
+# Multivariate plot for Age and Rapid Heart Rate
+ggplot(cholera_imputed, aes(x = age, y = rapidHeartRate)) +
+  geom_point(color = "red", alpha = 0.5) +
+  labs(title = "Scatter Plot of Age vs. Rapid Heart Rate", x = "Age", y = "Rapid Heart Rate")
+
+
