@@ -363,4 +363,93 @@ ggplot(cholera_imputed, aes(x = age, y = rapidHeartRate)) +
   geom_point(color = "red", alpha = 0.5) +
   labs(title = "Scatter Plot of Age vs. Rapid Heart Rate", x = "Age", y = "Rapid Heart Rate")
 
+# Data Transformation ----
+
+class_distribution <- table(cholera_imputed$choleraDiagnosis)
+print(class_distribution)
+
+## Undersampling ----
+# Load the necessary libraries
+
+library(caret)
+
+# Convert 'choleraDiagnosis' to a factor
+
+cholera_imputed$choleraDiagnosis <- as.factor(cholera_imputed$choleraDiagnosis)
+
+# Identify the positive and negative class samples
+
+positive_samples <- cholera_imputed[cholera_imputed$choleraDiagnosis == 1, ]
+negative_samples <- cholera_imputed[cholera_imputed$choleraDiagnosis == 0, ]
+
+# Undersample the majority class (in this case, the negative class)
+
+negative_samples_undersampled <- negative_samples[sample(nrow(negative_samples), nrow(positive_samples)), ]
+
+# Combine the undersampled negative class with the positive class
+
+cholera_undersampled <- rbind(negative_samples_undersampled, positive_samples)
+
+# Check the class distribution after applying undersampling
+
+table(cholera_undersampled$choleraDiagnosis)
+
+# Conclusion: The class distribution is now balanced after performing undersampling
+# This balance in the number of instances for each class will help mitigate the 
+# effects of class imbalance and ensure that your logistic regression model can 
+# learn from both classes effectively, leading to more accurate predictions and 
+# improved model performance.
+
+# Initial Data Analysis
+
+summary(cholera_undersampled)
+
+# Histogram for Age
+
+hist(cholera_undersampled$age, main = "Histogram for Age")
+
+# Histogram for Education
+
+hist(cholera_undersampled$education, main = "Histogram for Education")
+
+# Histogram for Watery Diarrhoea
+
+hist(cholera_undersampled$wateryDiarrhoea, main = "Histogram for Watery Diarrhoea")
+
+# Histogram for Dehydration
+
+hist(cholera_undersampled$dehydration, main = "Histogram for Dehydration")
+
+# Histogram for Vomiting
+
+hist(cholera_undersampled$vomiting, main = "Histogram for Vomiting")
+
+# Histogram for Muscle Cramps
+
+hist(cholera_undersampled$muscleCramps, main = "Histogram for Muscle Cramps")
+
+# Histogram for Rapid Heart Rate
+
+hist(cholera_undersampled$rapidHeartRate, main = "Histogram for Rapid Heart Rate")
+
+# Bar plot for Cholera Diagnosis
+
+barplot(table(cholera_undersampled$choleraDiagnosis), main = "Bar Plot for Cholera Diagnosis")
+
+# Conclusion: The variables that appear to be positively skewed are vomiting, muscle  
+# cramps and rapid heart rate. This means that their distributions are skewed to the
+# right, and the tail of the distribution extends towards the higher values. In this 
+# case, the mean is likely to be greater than the median for these variables.
+
+# Evaluation Metrics ----
+
+# Identify the number of instances that belong to each class (distribution or class breakdown).
+
+cholera_undersampled_choleraDiagnosis_freq <- cholera_undersampled$choleraDiagnosis
+class_distribution <- cbind(frequency = table(cholera_undersampled_choleraDiagnosis_freq),
+                            percentage = prop.table(table(cholera_undersampled_choleraDiagnosis_freq)) * 100)
+
+# Print the class distribution and percentage breakdown
+
+print(class_distribution)
 
