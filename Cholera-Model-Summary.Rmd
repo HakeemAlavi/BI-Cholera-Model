@@ -1,0 +1,407 @@
+---
+title: "Cholera Classification Model Project"
+always_allow_html: true
+author: "Hakeem Alavi"
+date: "30/10/2023"
+output:
+  github_document: 
+    toc: yes
+    toc_depth: 4
+    fig_width: 15
+    fig_height: 11
+    df_print: default
+editor_options:
+  chunk_output_type: console
+---
+
+# Student Details
+
+|                       |              |
+|-----------------------|--------------|
+| **Student ID Number** | 134775       |
+| **Student Name**      | Hakeem Alavi |
+| **BBIT 4.2 Group**    | C            |
+
+# Setup Chunk
+
+**Note:** the following KnitR options have been set as the global defaults: <BR> `knitr::opts_chunk$set(echo = TRUE, warning = FALSE, eval = TRUE, collapse = FALSE, tidy = TRUE)`.
+
+More KnitR options are documented here <https://bookdown.org/yihui/rmarkdown-cookbook/chunk-options.html> and here <https://yihui.org/knitr/options/>.
+
+```{r setup, include=FALSE}
+library(formatR)
+knitr::opts_chunk$set(
+  warning = FALSE,
+  collapse = FALSE
+)
+```
+
+# Classification Problem
+
+# STEP 1. Install and Load the Required Packages
+
+```{r Install and Load the Required Packages}
+
+
+if (!is.element("dplyr", installed.packages()[, 1])) {
+  install.packages("dplyr", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+require("dplyr")
+
+
+if (!is.element("naniar", installed.packages()[, 1])) {
+  install.packages("naniar", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+require("naniar")
+
+
+if (!is.element("ggplot2", installed.packages()[, 1])) {
+  install.packages("ggplot2", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+require("ggplot2")
+
+# We use the MICE package to perform data imputation
+
+if (!is.element("mice", installed.packages()[, 1])) {
+  install.packages("mice", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+require("mice")
+
+if (!is.element("Amelia", installed.packages()[, 1])) {
+  install.packages("Amelia", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+require("Amelia")
+
+if (require("caret")) {
+  require("caret")
+} else {
+  install.packages("caret", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+
+if (require("mlbench")) {
+  require("mlbench")
+} else {
+  install.packages("mlbench", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+
+if (require("pROC")) {
+  require("pROC")
+} else {
+  install.packages("pROC", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+
+if (require("stats")) {
+  require("stats")
+} else {
+  install.packages("stats", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+
+
+
+## caret ----
+if (require("caret")) {
+  require("caret")
+} else {
+  install.packages("caret", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+
+## MASS ----
+if (require("MASS")) {
+  require("MASS")
+} else {
+  install.packages("MASS", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+
+## glmnet ----
+if (require("glmnet")) {
+  require("glmnet")
+} else {
+  install.packages("glmnet", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+
+## e1071 ----
+if (require("e1071")) {
+  require("e1071")
+} else {
+  install.packages("e1071", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+
+## kernlab ----
+if (require("kernlab")) {
+  require("kernlab")
+} else {
+  install.packages("kernlab", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+
+## rpart ----
+if (require("rpart")) {
+  require("rpart")
+} else {
+  install.packages("rpart", dependencies = TRUE,
+                   repos = "https://cloud.r-project.org")
+}
+
+
+```
+
+# STEP 2. Load and pre-process the dataset
+
+```{r}
+# Importing Dataset ----
+
+library(readr)
+cholera <- read_csv("data/cholera.csv")
+
+### Confirm the "missingness" in the Dataset before Imputation ----
+# Are there missing values in the dataset?
+
+any_na(cholera)
+
+# How many?
+
+n_miss(cholera)
+
+# What is the percentage of missing data in the entire dataset?
+
+prop_miss(cholera)
+
+# How many missing values does each variable have?
+
+cholera %>% is.na() %>% colSums()
+
+# What is the number and percentage of missing values grouped by
+# each variable?
+
+miss_var_summary(cholera)
+
+# What is the number and percentage of missing values grouped by
+# each observation?
+
+miss_case_summary(cholera)
+
+# Which variables contain the most missing values?
+
+gg_miss_var(cholera)
+
+# Where are missing values located (the shaded regions in the plot)?
+
+vis_miss(cholera) + theme(axis.text.x = element_text(angle = 80))
+
+# Which combinations of variables are missing together?
+
+gg_miss_upset(cholera)
+
+# Assuming cholera is your dataset
+
+library(mice)
+
+# Create an empty predictor matrix
+
+predictorMatrix <- matrix(0, ncol = ncol(cholera), nrow = ncol(cholera), 
+                          dimnames = list(names(cholera), names(cholera)))
+
+# Specify the imputation methods for the 'education' and 'vomiting' columns
+
+predictorMatrix['education', ] <- "polr"
+predictorMatrix['vomiting', ] <- "logreg"
+
+# Run mice with the specified imputation methods
+
+cholera_mice <- mice(cholera, m = 11, method = 'pmm', seed = 7, predictorMatrix = predictorMatrix)
+
+
+# We can use multiple scatter plots (a.k.a. strip-plots) to visualize how
+# random the imputed data is in each of the 11 datasets.
+
+# For education, which is a categorical variable
+
+stripplot(cholera_mice,
+          education ~ age | .imp,
+          pch = 15, cex = 1.5)
+
+# For vomiting, which is a binary variable
+
+stripplot(cholera_mice,
+          vomiting ~ age | .imp,
+          pch = 17, cex = 1.5)
+
+### Impute the missing data ----
+
+cholera_imputed <- mice::complete(cholera_mice, 1)
+
+### Confirm the "missingness" in the Imputed Dataset ----
+# A textual confirmation that the dataset has no more missing values in any
+# feature:
+
+miss_var_summary(cholera_imputed)
+
+# A visual confirmation that the dataset has no more missing values in any
+# feature:
+
+Amelia::missmap(cholera_imputed)
+
+
+# Are there missing values in the dataset?
+
+any_na(cholera_imputed)
+
+# How many?
+
+n_miss(cholera_imputed)
+
+# What is the percentage of missing data in the entire dataset?
+
+prop_miss(cholera_imputed)
+
+# How many missing values does each variable have?
+
+cholera_imputed %>% is.na() %>% colSums()
+
+# What is the number and percentage of missing values grouped by
+# each variable?
+
+miss_var_summary(cholera_imputed)
+
+# What is the number and percentage of missing values grouped by
+# each observation?
+
+miss_case_summary(cholera_imputed)
+
+# Which variables contain the most missing values?
+
+gg_miss_var(cholera_imputed)
+
+# We require the "ggplot2" package to create more appealing visualizations
+# Where are missing values located (the shaded regions in the plot)?
+
+vis_miss(cholera_imputed) + theme(axis.text.x = element_text(angle = 80))
+
+
+## Undersampling ----
+# Load the necessary libraries
+
+library(caret)
+
+# Convert 'choleraDiagnosis' to a factor
+
+cholera_imputed$choleraDiagnosis <- as.factor(cholera_imputed$choleraDiagnosis)
+
+# Identify the positive and negative class samples
+
+positive_samples <- cholera_imputed[cholera_imputed$choleraDiagnosis == 1, ]
+negative_samples <- cholera_imputed[cholera_imputed$choleraDiagnosis == 0, ]
+
+# Undersample the majority class (in this case, the negative class)
+
+negative_samples_undersampled <- negative_samples[sample(nrow(negative_samples), nrow(positive_samples)), ]
+
+# Combine the undersampled negative class with the positive class
+
+cholera_undersampled <- rbind(negative_samples_undersampled, positive_samples)
+
+# Check the class distribution after applying undersampling
+
+table(cholera_undersampled$choleraDiagnosis)
+
+# Conclusion: The class distribution is now balanced after performing undersampling
+
+# This balance in the number of instances for each class will help mitigate the
+
+# effects of class imbalance and ensure that your logistic regression model can
+
+# learn from both classes effectively, leading to more accurate predictions and
+
+# improved model performance.
+
+# Initial Data Analysis
+
+summary(cholera_undersampled)
+
+
+```
+
+# STEP 3. Dataset splitting
+
+```{r}
+## Dataset Splitting ----
+# Define a 75:25 train:test data split of the dataset.
+# That is, 75% of the original data will be used to train the model and
+# 25% of the original data will be used to test the model.
+
+train_index <- createDataPartition(cholera_undersampled$choleraDiagnosis,
+                                   p = 0.75,
+                                   list = FALSE)
+cholera_train <- cholera_undersampled[train_index, ]
+cholera_test <- cholera_undersampled[-train_index, ]
+
+library(caret)
+
+# 5-fold cross-validation
+
+train_control <- trainControl(method = "cv", number = 5)
+
+```
+
+# STEP 4. Model creation
+
+```{r}
+## Logistic Regression 2 ----
+# We can use "glmnet" 
+
+set.seed(7)
+cholera_caret_model_logistic_two <- train(
+  choleraDiagnosis ~ ., 
+  data = cholera_train,
+  method = "glmnet",
+  family = "binomial",
+  metric = "Accuracy",
+  preProcess = c("center", "scale"),
+  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE),
+  maxit = 1000
+)
+
+# Check for multicollinearity
+findLinearCombos(cholera_train[, -which(names(cholera_train) %in% "choleraDiagnosis")])
+
+print(cholera_caret_model_logistic_two)
+
+### Calculating Metrics ----
+# Make predictions
+
+cholera_predictions_lr_two <- predict(cholera_caret_model_logistic_two,
+                                  cholera_test)
+
+# Display the model's evaluation metrics 
+
+cholera_confusion_matrix_lr_two <-
+  caret::confusionMatrix(cholera_predictions_lr_two,
+                         cholera_test$choleraDiagnosis)
+print(cholera_confusion_matrix_lr_two)
+
+
+
+```
+
+# STEP 5. Visualize the results
+
+```{r}
+### Confusion Matrix ----
+
+fourfoldplot(as.table(cholera_confusion_matrix_lr_two), color = c("grey", "lightblue"),
+             main = "Confusion Matrix (LR 2)") 
+
+```
